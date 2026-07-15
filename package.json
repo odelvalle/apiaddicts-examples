@@ -1,0 +1,17 @@
+{
+  "name": "mcp-soporte-cliente",
+  "version": "1.0.0",
+  "description": "MCP Server de ejemplo para el curso MCP Owner: Seguridad y Testing",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.15.0",
+    "zod": "^3.23.8"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
