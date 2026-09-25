@@ -1,7 +1,7 @@
 # apiaddicts-examples
 
 Repositorio de ejemplos y proyectos **didácticos** utilizados en los cursos de
-[apiaddicts](https://apiaddicts.com). El contenido tiene fines exclusivamente
+[apiaddicts](https://www.apiaddicts.org/). El contenido tiene fines exclusivamente
 formativos: ilustrar conceptos, patrones y buenas prácticas que se explican
 durante las sesiones de formación.
 
