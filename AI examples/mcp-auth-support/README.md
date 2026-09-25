@@ -1,20 +1,32 @@
 # MCP Soporte Cliente — Ejemplo Práctico
 
-Servidor MCP de ejemplo para el curso **MCP Owner: Seguridad y Testing**.
+Monorepo (pnpm workspaces) de ejemplo para el curso **MCP Owner: Seguridad y Testing**.
 
 Simula el backend de soporte al cliente de una empresa con múltiples tenants.
 Expone seis tools que demuestran, una a una, los controles de seguridad que
 un MCP Owner debe exigir antes de publicar cualquier capacidad a un agente.
+
+El repositorio está dividido en dos apps independientes (cada una levanta
+su propio proceso/servicio, no son librerías compartidas):
+
+- **`@mcp-soporte-cliente/mcp-server`** — el servidor MCP (resource server).
+- **`@mcp-soporte-cliente/api-manager`** — el API Manager / Authorization
+  Server externo simulado, que valida tokens vía introspección OAuth 2.0.
 
 ---
 
 ## Instalación rápida
 
 ```bash
-npm install
-npm test                                        # 31 tests, 0 fallos
-npx @modelcontextprotocol/inspector node server.js  # abrir en navegador
+pnpm install
+pnpm test                                        # ejecuta los tests de todas las apps
+pnpm run api-manager                            # terminal 1: Authorization Server simulado (puerto 4001)
+npx @modelcontextprotocol/inspector node apps/mcp-server/server.js  # terminal 2
 ```
+
+El servidor MCP **no valida tokens por sí mismo**: delega en la app
+`api-manager` vía introspección OAuth 2.0. Si el API Manager no está
+arrancado, todas las tools rechazarán las llamadas con `Servicio de autorización no disponible`.
 
 ---
 
@@ -22,35 +34,101 @@ npx @modelcontextprotocol/inspector node server.js  # abrir en navegador
 
 ```
 ejemplo-práctico/
-├── server.js                     # Punto de entrada MCP (transporte stdio)
-├── lib/
-│   ├── data.js                   # Estado en memoria (simula base de datos)
-│   ├── auth.js                   # Resolución de token y control de acceso
-│   ├── audit.js                  # Audit log con correlationId y PII masking
-│   └── tools.js                  # Lógica de negocio (testable sin MCP)
-└── tests/
-    ├── 01-functional.test.js     # Happy path de cada tool
-    ├── 02-authorization.test.js  # Tenant isolation y roles
-    └── 03-adversarial.test.js    # Prompt injection y abuso de parámetros
+├── pnpm-workspace.yaml            # Declara las apps del monorepo
+├── package.json                   # Workspace raíz (scripts agregados: start, test, api-manager)
+└── apps/
+    ├── mcp-server/                 # @mcp-soporte-cliente/mcp-server
+    │   ├── server.js                # Punto de entrada MCP (transporte stdio)
+    │   ├── lib/
+    │   │   ├── data.js               # Estado en memoria (simula base de datos)
+    │   │   ├── auth.js               # Resolución de token vía introspección OAuth y control de acceso
+    │   │   ├── oauthClient.js        # Cliente HTTP hacia el API Manager (timeout, fail-closed)
+    │   │   ├── audit.js              # Audit log con correlationId y PII masking
+    │   │   └── tools.js              # Lógica de negocio (testable sin MCP)
+    │   └── tests/
+    │       ├── 01-functional.test.js     # Happy path de cada tool
+    │       ├── 02-authorization.test.js  # Tenant isolation y roles
+    │       ├── 03-adversarial.test.js    # Prompt injection y abuso de parámetros
+    │       └── 04-oauth-manager.test.js  # Login, expirado, revocado, caído, timeout, scopes
+    └── api-manager/                # @mcp-soporte-cliente/api-manager
+        ├── index.js                   # Exporta startApiManager, login, revokeToken
+        ├── bin/
+        │   ├── start.js                 # Arranca el Authorization Server (standalone)
+        │   └── login.js                 # CLI: ejecuta el login OAuth y muestra el access_token
+        └── lib/
+            ├── apiManager.js            # Authorization Server: /oauth/authorize, /login, /token, /introspect, /revoke
+            └── demoClient.js            # Cliente de demo del flujo Authorization Code + PKCE
 ```
 
-La lógica de negocio vive en `lib/tools.js`, **separada del protocolo MCP**.
-Esto permite testear la seguridad directamente, sin levantar el servidor.
+La lógica de negocio vive en `apps/mcp-server/lib/tools.js`, **separada
+del protocolo MCP**. Esto permite testear la seguridad directamente, sin
+levantar el servidor. Los tests de la app `mcp-server` dependen de la
+app `api-manager` como `devDependency` con el protocolo `workspace:*`
+de pnpm, para poder levantar una instancia real en cada test.
 
 ---
 
-## Tokens de demo
+## Autenticación: OAuth 2.0 Authorization Code + PKCE, delegado a un API Manager externo
 
-Cada token simula un JWT validado. En producción llegaría en el header
-`Authorization`; aquí se pasa como parámetro de tool para facilitar las demos
-con MCP Inspector.
+El MCP server actúa como **resource server** OAuth 2.0: no contiene ninguna
+tabla de usuarios, contraseñas ni lógica de login. Toda la autenticación
+ocurre en la app **api-manager**, que implementa el flujo estándar
+**Authorization Code + PKCE** (RFC 6749 + RFC 7636):
 
-| Token | Tenant | Roles |
-|-------|--------|-------|
-| `token-agent-A` | tenant-A | AGENT |
-| `token-support-A` | tenant-A | AGENT, SUPPORT |
-| `token-finance-A` | tenant-A | AGENT, FINANCE |
-| `token-agent-B` | tenant-B | AGENT |
+```
+1. Humano/CLI  ──GET /oauth/authorize──▶  API Manager   (formulario de login)
+2. Humano/CLI  ──POST /oauth/login─────▶  API Manager   (usuario + contraseña)
+                                              │
+                                              └─▶ devuelve un `code` de un solo uso
+3. Humano/CLI  ──POST /oauth/token─────▶  API Manager   (code + code_verifier)
+                                              │
+                                              └─▶ devuelve el access_token
+
+4. Agente ──callerToken (access_token)──▶ MCP server ──POST /oauth/introspect──▶ API Manager
+                                                │                                      │
+                                                │◀── { active, sub, tenant_id, scope } ┘
+                                                ▼
+                                       mapea scope → rol de negocio
+                                       (agent:read, support:write, finance:refund)
+```
+
+Los pasos 1-3 los realiza un cliente (en esta demo, la CLI `pnpm --filter
+@mcp-soporte-cliente/api-manager login`) **antes** de hablar con el MCP
+server. El paso 4 es el único que ejecuta el MCP server en cada llamada a
+una tool, y es puramente de validación (introspección) — nunca ve la
+contraseña del usuario.
+
+**PKCE** (Proof Key for Code Exchange): el cliente genera un `code_verifier`
+aleatorio y envía su hash (`code_challenge`) al iniciar sesión; al canjear
+el `code` por el token debe volver a presentar el `code_verifier` original.
+Esto evita que un `code` interceptado (p.ej. en el historial de un navegador)
+pueda canjearse por un atacante que no conozca el verifier.
+
+**Fail-closed:** si el API Manager no responde (caído, timeout de red), el
+acceso se deniega — nunca se asume que un token es válido por defecto.
+
+## Usuarios y flujo de login
+
+No hay tokens estáticos: cada `access_token` se obtiene iniciando sesión con
+usuario y contraseña contra el API Manager. Estos son los usuarios de demo:
+
+| Usuario | Contraseña | Tenant | Scope OAuth | Roles resultantes |
+|---------|-----------|--------|-------------|--------------------|
+| `agent.a`   | `demo1234` | tenant-A | `agent:read` | AGENT |
+| `support.a` | `demo1234` | tenant-A | `agent:read support:write` | AGENT, SUPPORT |
+| `finance.a` | `demo1234` | tenant-A | `agent:read finance:refund` | AGENT, FINANCE |
+| `agent.b`   | `demo1234` | tenant-B | `agent:read` | AGENT |
+
+Para obtener un `access_token` real (con el API Manager ya arrancado):
+
+```bash
+pnpm --filter @mcp-soporte-cliente/api-manager login -- --username support.a --password demo1234
+```
+
+Esto ejecuta el flujo completo (login + PKCE + intercambio de code) y
+imprime el `access_token` que debes pegar como `callerToken` en MCP
+Inspector. Cada token expira según `API_MANAGER_TOKEN_TTL_MS` (1 hora por
+defecto) y puede revocarse vía `POST /oauth/revoke`.
 
 ---
 
@@ -63,8 +141,17 @@ escribe en `stderr`.
 ### Arrancar
 
 ```bash
-npx @modelcontextprotocol/inspector node server.js
+pnpm run api-manager                                 # terminal 1: Authorization Server simulado
+pnpm --filter @mcp-soporte-cliente/api-manager login -- --username agent.a --password demo1234
+                                                      # copia el access_token que imprime
+npx @modelcontextprotocol/inspector node apps/mcp-server/server.js   # terminal 2
 ```
+
+El servidor MCP consulta el API Manager en cada llamada a una tool. Si el
+Inspector se lanza sin haber arrancado `pnpm run api-manager` primero, todas
+las tools devolverán `Servicio de autorización no disponible` (fail-closed).
+Repite el comando `login` con `support.a` o `finance.a` para obtener tokens
+con otros roles.
 
 Se abre automáticamente en `http://localhost:6274`. El panel izquierdo muestra
 las tools disponibles; el derecho muestra la respuesta de cada llamada.
@@ -77,13 +164,17 @@ En la terminal donde arrancaste el Inspector verás los audit logs en tiempo rea
 
 ### Secuencia de demo recomendada
 
+En cada paso, sustituye `<access_token>` por el token obtenido con
+`pnpm --filter @mcp-soporte-cliente/api-manager login -- --username <usuario> --password demo1234`
+para el usuario indicado.
+
 #### Paso 1 — Consulta de perfil (happy path)
 
-Tool: **`getCustomerProfile`**
+Tool: **`getCustomerProfile`** — usuario `agent.a`
 
 ```json
 {
-  "callerToken": "token-agent-A",
+  "callerToken": "<access_token de agent.a>",
   "customerId": "cust-001"
 }
 ```
@@ -94,16 +185,16 @@ Resultado esperado: perfil de Ana García con email enmascarado (`a***@example.c
 
 #### Paso 2 — Tenant isolation (rechazo)
 
-Tool: **`getCustomerProfile`**
+Tool: **`getCustomerProfile`** — usuario `agent.a`
 
 ```json
 {
-  "callerToken": "token-agent-A",
+  "callerToken": "<access_token de agent.a>",
   "customerId": "cust-003"
 }
 ```
 
-`cust-003` pertenece a `tenant-B`. El token es de `tenant-A`.
+`cust-003` pertenece a `tenant-B`. El usuario `agent.a` es de `tenant-A`.
 Resultado esperado: `AuthError — Acceso denegado. El recurso pertenece a un tenant diferente.`
 
 El audit log mostrará `"status": "rejected"`.
@@ -112,31 +203,31 @@ El audit log mostrará `"status": "rejected"`.
 
 #### Paso 3 — Control de rol (rechazo)
 
-Tool: **`createSupportTicket`**
+Tool: **`createSupportTicket`** — usuario `agent.a`
 
 ```json
 {
-  "callerToken": "token-agent-A",
+  "callerToken": "<access_token de agent.a>",
   "customerId": "cust-001",
   "category": "billing",
   "description": "Prueba de elevación de privilegios."
 }
 ```
 
-`token-agent-A` solo tiene rol `AGENT`. Crear tickets requiere `SUPPORT`.
+`agent.a` solo tiene scope `agent:read` → rol `AGENT`. Crear tickets requiere `SUPPORT`.
 Resultado esperado: `AuthError — Permiso insuficiente. Rol requerido: 'SUPPORT'`.
 
-Repetir con `token-support-A` para ver el happy path.
+Repetir con un token de `support.a` para ver el happy path.
 
 ---
 
 #### Paso 4 — Flujo de reembolso (human-in-the-loop)
 
-**4a.** Consultar elegibilidad con **`calculateRefundEligibility`**:
+**4a.** Consultar elegibilidad con **`calculateRefundEligibility`** — usuario `finance.a`:
 
 ```json
 {
-  "callerToken": "token-finance-A",
+  "callerToken": "<access_token de finance.a>",
   "orderId": "ord-001"
 }
 ```
@@ -148,7 +239,7 @@ pedido supera ese importe).
 
 ```json
 {
-  "callerToken": "token-finance-A",
+  "callerToken": "<access_token de finance.a>",
   "orderId": "ord-001",
   "amount": 50,
   "reason": "El cliente recibió un producto defectuoso según ticket TKT-1001."
@@ -162,11 +253,11 @@ Resultado esperado: `status: "pending"` con un `approvalId`. El reembolso
 
 #### Paso 5 — Abuso de parámetros (rechazo)
 
-Tool: **`requestRefundApproval`**
+Tool: **`requestRefundApproval`** — usuario `finance.a`
 
 ```json
 {
-  "callerToken": "token-finance-A",
+  "callerToken": "<access_token de finance.a>",
   "orderId": "ord-001",
   "amount": 999999,
   "reason": "Importe extremo para probar el límite server-side."
@@ -179,7 +270,7 @@ Probar también con un campo extra para ver `.strict()` en acción:
 
 ```json
 {
-  "callerToken": "token-finance-A",
+  "callerToken": "<access_token de finance.a>",
   "orderId": "ord-001",
   "amount": 50,
   "reason": "Motivo válido de diez caracteres o más.",
@@ -193,11 +284,11 @@ Resultado esperado: `Unrecognized key(s) in object: 'forceApproval'`.
 
 #### Paso 6 — Email con template no permitido (rechazo)
 
-Tool: **`sendCustomerEmail`**
+Tool: **`sendCustomerEmail`** — usuario `support.a`
 
 ```json
 {
-  "callerToken": "token-support-A",
+  "callerToken": "<access_token de support.a>",
   "customerId": "cust-001",
   "templateId": "mensaje-libre",
   "params": { "customerName": "Ana" }
@@ -442,11 +533,12 @@ protocolo MCP (JSON-RPC).
 | `01-functional.test.js` | Happy path: las tools devuelven lo correcto con parámetros válidos | 9 |
 | `02-authorization.test.js` | Tenant isolation, elevación de rol, tokens inválidos | 11 |
 | `03-adversarial.test.js` | Prompt injection, IDs maliciosos, overflow numérico, campos extra, templates fuera de allowlist | 11 |
+| `04-oauth-manager.test.js` | Login OAuth (Authorization Code + PKCE), token expirado/revocado, mapeo scope→rol, API Manager caído o lento (fail-closed) | 8 |
 
 Ejecutar con:
 
 ```bash
-npm test
+pnpm test
 ```
 
 ---

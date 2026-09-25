@@ -1,7 +1,8 @@
 {
-  "name": "mcp-soporte-cliente",
+  "name": "@mcp-soporte-cliente/mcp-server",
   "version": "1.0.0",
-  "description": "MCP Server de ejemplo para el curso MCP Owner: Seguridad y Testing",
+  "private": true,
+  "description": "Servidor MCP de soporte al cliente (transporte stdio)",
   "type": "module",
   "scripts": {
     "start": "node server.js",
@@ -10,6 +11,9 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.15.0",
     "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@mcp-soporte-cliente/api-manager": "workspace:*"
   },
   "engines": {
     "node": ">=20.0.0"

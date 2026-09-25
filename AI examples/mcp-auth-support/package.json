@@ -1,0 +1,17 @@
+{
+  "name": "mcp-soporte-cliente",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monorepo de ejemplo para el curso MCP Owner: Seguridad y Testing",
+  "type": "module",
+  "scripts": {
+    "start": "pnpm --filter @mcp-soporte-cliente/mcp-server start",
+    "api-manager": "pnpm --filter @mcp-soporte-cliente/api-manager start",
+    "test": "pnpm -r test"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
+

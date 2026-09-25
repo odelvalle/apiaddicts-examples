@@ -9,10 +9,11 @@
  * lo que permite pruebas rápidas y aisladas de la lógica de negocio.
  */
 
-import { describe, it } from "node:test";
+import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 
 import { resolveCallerContext } from "../lib/auth.js";
+import { startApiManager, login } from "@mcp-soporte-cliente/api-manager";
 import {
   getCustomerProfile,
   getCustomerOrders,
@@ -23,10 +24,27 @@ import {
 } from "../lib/tools.js";
 import { tickets, approvals, emailLog } from "../lib/data.js";
 
-// Contextos de prueba — equivalen a tokens JWT validados en producción
-const agentCtx   = resolveCallerContext("token-agent-A");
-const supportCtx = resolveCallerContext("token-support-A");
-const financeCtx = resolveCallerContext("token-finance-A");
+// Contextos de prueba — se obtienen vía login OAuth (Authorization Code + PKCE)
+// y se resuelven contra el API Manager simulado (introspección)
+let apiManager;
+let agentCtx, supportCtx, financeCtx;
+
+before(async () => {
+  apiManager = await startApiManager();
+  process.env.API_MANAGER_URL = apiManager.url;
+
+  const agentLogin   = await login({ baseUrl: apiManager.url, username: "agent.a",   password: "demo1234" });
+  const supportLogin = await login({ baseUrl: apiManager.url, username: "support.a", password: "demo1234" });
+  const financeLogin = await login({ baseUrl: apiManager.url, username: "finance.a", password: "demo1234" });
+
+  agentCtx   = await resolveCallerContext(agentLogin.access_token);
+  supportCtx = await resolveCallerContext(supportLogin.access_token);
+  financeCtx = await resolveCallerContext(financeLogin.access_token);
+});
+
+after(async () => {
+  await apiManager.close();
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("getCustomerProfile", () => {

@@ -12,10 +12,11 @@
  * independientemente de lo que escriba en los parámetros.
  */
 
-import { describe, it } from "node:test";
+import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 
 import { resolveCallerContext, AuthError } from "../lib/auth.js";
+import { startApiManager, login } from "@mcp-soporte-cliente/api-manager";
 import {
   getCustomerProfile,
   getCustomerOrders,
@@ -25,8 +26,23 @@ import {
   sendCustomerEmail,
 } from "../lib/tools.js";
 
-const agentA = resolveCallerContext("token-agent-A");   // tenant-A, solo AGENT
-const agentB = resolveCallerContext("token-agent-B");   // tenant-B, solo AGENT
+let apiManager;
+let agentA, agentB; // tenant-A/AGENT y tenant-B/AGENT, obtenidos vía login OAuth
+
+before(async () => {
+  apiManager = await startApiManager();
+  process.env.API_MANAGER_URL = apiManager.url;
+
+  const agentALogin = await login({ baseUrl: apiManager.url, username: "agent.a", password: "demo1234" });
+  const agentBLogin = await login({ baseUrl: apiManager.url, username: "agent.b", password: "demo1234" });
+
+  agentA = await resolveCallerContext(agentALogin.access_token);
+  agentB = await resolveCallerContext(agentBLogin.access_token);
+});
+
+after(async () => {
+  await apiManager.close();
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("Tenant isolation", () => {
@@ -99,7 +115,8 @@ describe("Control de roles", () => {
   });
 
   it("rol SUPPORT no puede solicitar reembolsos — requiere FINANCE", async () => {
-    const supportCtx = resolveCallerContext("token-support-A");
+    const supportLogin = await login({ baseUrl: apiManager.url, username: "support.a", password: "demo1234" });
+    const supportCtx   = await resolveCallerContext(supportLogin.access_token);
     await assert.rejects(
       () => requestRefundApproval(supportCtx, {
         orderId: "ord-001",
@@ -113,29 +130,29 @@ describe("Control de roles", () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("Tokens inválidos", () => {
-  it("token inexistente lanza AuthError", () => {
-    assert.throws(
+  it("token inexistente lanza AuthError", async () => {
+    await assert.rejects(
       () => resolveCallerContext("token-inventado-que-no-existe"),
       AuthError
     );
   });
 
-  it("token vacío lanza AuthError", () => {
-    assert.throws(
+  it("token vacío lanza AuthError", async () => {
+    await assert.rejects(
       () => resolveCallerContext(""),
       AuthError
     );
   });
 
-  it("token nulo lanza AuthError", () => {
-    assert.throws(
+  it("token nulo lanza AuthError", async () => {
+    await assert.rejects(
       () => resolveCallerContext(null),
       AuthError
     );
   });
 
-  it("token undefined lanza AuthError", () => {
-    assert.throws(
+  it("token undefined lanza AuthError", async () => {
+    await assert.rejects(
       () => resolveCallerContext(undefined),
       AuthError
     );

@@ -1,0 +1,15 @@
+{
+  "name": "@mcp-soporte-cliente/api-manager",
+  "version": "1.0.0",
+  "private": true,
+  "description": "API Manager / Authorization Server simulado (OAuth 2.0 Authorization Code + PKCE, introspección RFC 7662)",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node bin/start.js",
+    "login": "node bin/login.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

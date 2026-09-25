@@ -15,10 +15,11 @@
  * el servidor los rechaza antes de que afecten al sistema.
  */
 
-import { describe, it } from "node:test";
+import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 
 import { resolveCallerContext } from "../lib/auth.js";
+import { startApiManager, login } from "@mcp-soporte-cliente/api-manager";
 import {
   getCustomerProfile,
   getCustomerOrders,
@@ -27,9 +28,25 @@ import {
   sendCustomerEmail,
 } from "../lib/tools.js";
 
-const agentCtx   = resolveCallerContext("token-agent-A");
-const supportCtx = resolveCallerContext("token-support-A");
-const financeCtx = resolveCallerContext("token-finance-A");
+let apiManager;
+let agentCtx, supportCtx, financeCtx;
+
+before(async () => {
+  apiManager = await startApiManager();
+  process.env.API_MANAGER_URL = apiManager.url;
+
+  const agentLogin   = await login({ baseUrl: apiManager.url, username: "agent.a",   password: "demo1234" });
+  const supportLogin = await login({ baseUrl: apiManager.url, username: "support.a", password: "demo1234" });
+  const financeLogin = await login({ baseUrl: apiManager.url, username: "finance.a", password: "demo1234" });
+
+  agentCtx   = await resolveCallerContext(agentLogin.access_token);
+  supportCtx = await resolveCallerContext(supportLogin.access_token);
+  financeCtx = await resolveCallerContext(financeLogin.access_token);
+});
+
+after(async () => {
+  await apiManager.close();
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("Prompt injection en campos de texto", () => {

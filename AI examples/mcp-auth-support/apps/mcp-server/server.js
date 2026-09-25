@@ -14,9 +14,13 @@
  *
  * NOTA SOBRE AUTENTICACIÓN:
  * En este demo, el token del llamante se pasa como parámetro de cada tool
- * para facilitar las demostraciones en MCP Inspector.
- * En producción con transporte HTTP, el token llegaría en el header
- * Authorization y sería validado antes de que el agente vea la llamada.
+ * para facilitar las demostraciones en MCP Inspector. En producción con
+ * transporte HTTP llegaría en el header Authorization.
+ *
+ * El token NO se valida en este proceso: se delega en un API Manager /
+ * Authorization Server externo (paquete @mcp-soporte-cliente/api-manager)
+ * mediante introspección OAuth 2.0 (RFC 7662).
+ * Arrancar antes: `pnpm run api-manager` (ver lib/auth.js y lib/oauthClient.js).
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -50,7 +54,7 @@ function toMcpError(err) {
 function withAuth(fn) {
   return async ({ callerToken, ...params }) => {
     try {
-      const callerCtx = resolveCallerContext(callerToken);
+      const callerCtx = await resolveCallerContext(callerToken);
       const result    = await fn(callerCtx, params);
       return { content: [{ type: /** @type {"text"} */ ("text"), text: JSON.stringify(result, null, 2) }] };
     } catch (err) {
