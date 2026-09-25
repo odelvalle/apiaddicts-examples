@@ -7,8 +7,8 @@
  * lo único que cuenta es el token validado externamente.
  *
  * El MCP server actúa como "resource server" OAuth 2.0: no valida tokens por
- * sí mismo, delega la verificación a un API Manager / Authorization Server
- * externo (lib/apiManager.js) vía el endpoint de introspección (RFC 7662).
+ * sí mismo, delega la verificación a un Authorization Server externo
+ * (apps/auth-server/lib/authServer.js) vía el endpoint de introspección (RFC 7662).
  * Si ese servicio no responde, el acceso se deniega (fail-closed).
  */
 
@@ -20,7 +20,7 @@ export const ROLES = {
   FINANCE: "FINANCE",  // Solicitud de reembolsos
 };
 
-// Mapeo scope OAuth → rol de aplicación. El API Manager solo conoce scopes;
+// Mapeo scope OAuth → rol de aplicación. El Authorization Server solo conoce scopes;
 // la traducción a roles de negocio vive en el resource server (este MCP).
 const SCOPE_TO_ROLE = {
   "agent:read":     ROLES.AGENT,
@@ -37,7 +37,7 @@ export class AuthError extends Error {
 }
 
 /**
- * Resuelve el contexto del llamante validando el token contra el API Manager
+ * Resuelve el contexto del llamante validando el token contra el Authorization Server
  * externo (introspección OAuth 2.0). Async porque implica una llamada de red real.
  */
 export async function resolveCallerContext(token) {

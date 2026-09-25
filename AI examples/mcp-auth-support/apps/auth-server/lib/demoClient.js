@@ -12,7 +12,7 @@
  */
 
 import { randomBytes, createHash, randomUUID } from "node:crypto";
-import { OOB_REDIRECT_URI } from "./apiManager.js";
+import { OOB_REDIRECT_URI } from "./authServer.js";
 
 const DEMO_CLIENT_ID = "demo-mcp-client";
 

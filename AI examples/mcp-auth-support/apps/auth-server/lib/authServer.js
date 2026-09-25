@@ -1,6 +1,6 @@
 /**
- * lib/apiManager.js
- * "API Manager" / Authorization Server simulado — servicio EXTERNO al servidor MCP.
+ * lib/authServer.js
+ * Authorization Server simulado — servicio EXTERNO al servidor MCP.
  *
  * Implementa el flujo OAuth 2.0 Authorization Code + PKCE (RFC 6749 + RFC 7636):
  *   GET  /oauth/authorize   → sirve un formulario de login (usuario/contraseña)
@@ -45,10 +45,10 @@ const accessTokens = new Map(); // token -> { sub, tenant_id, scope, exp, revoke
 
 // Leídos en cada llamada (no cacheados) para poder ajustarlos desde los tests.
 function getTokenTtlMs() {
-  return Number(process.env.API_MANAGER_TOKEN_TTL_MS) || 3_600_000; // 1h por defecto
+  return Number(process.env.AUTH_SERVER_TOKEN_TTL_MS) || 3_600_000; // 1h por defecto
 }
 function getIntrospectDelayMs() {
-  return Number(process.env.API_MANAGER_INTROSPECT_DELAY_MS) || 0;
+  return Number(process.env.AUTH_SERVER_INTROSPECT_DELAY_MS) || 0;
 }
 
 function sleep(ms) {
@@ -249,7 +249,7 @@ async function handleRevoke(req, res) {
   sendJson(res, 200, {});
 }
 
-function createApiManager() {
+function createAuthServer() {
   return createServer((req, res) => {
     const url = new URL(req.url, "http://localhost");
     const route = `${req.method} ${url.pathname}`;
@@ -272,12 +272,12 @@ function createApiManager() {
 }
 
 /**
- * Arranca el API Manager simulado y devuelve su URL base y un `close()`.
+ * Arranca el Authorization Server simulado y devuelve su URL base y un `close()`.
  * Con `port: 0` (por defecto) el SO asigna un puerto libre — ideal para tests.
  */
-export function startApiManager({ port = 0 } = {}) {
+export function startAuthServer({ port = 0 } = {}) {
   return new Promise((resolve, reject) => {
-    const server = createApiManager();
+    const server = createAuthServer();
     server.once("error", reject);
     server.listen(port, () => {
       const actualPort = server.address().port;

@@ -17,10 +17,10 @@
  * para facilitar las demostraciones en MCP Inspector. En producción con
  * transporte HTTP llegaría en el header Authorization.
  *
- * El token NO se valida en este proceso: se delega en un API Manager /
- * Authorization Server externo (paquete @mcp-soporte-cliente/api-manager)
+ * El token NO se valida en este proceso: se delega en un Authorization Server
+ * externo (paquete @mcp-soporte-cliente/auth-server)
  * mediante introspección OAuth 2.0 (RFC 7662).
- * Arrancar antes: `pnpm run api-manager` (ver lib/auth.js y lib/oauthClient.js).
+ * Arrancar antes: `pnpm run auth-server` (ver lib/auth.js y lib/oauthClient.js).
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";

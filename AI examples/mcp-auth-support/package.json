@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "pnpm --filter @mcp-soporte-cliente/mcp-server start",
-    "api-manager": "pnpm --filter @mcp-soporte-cliente/api-manager start",
+    "auth-server": "pnpm --filter @mcp-soporte-cliente/auth-server start",
     "test": "pnpm -r test"
   },
   "engines": {

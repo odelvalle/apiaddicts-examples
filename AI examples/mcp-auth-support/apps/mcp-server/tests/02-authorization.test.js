@@ -16,7 +16,7 @@ import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 
 import { resolveCallerContext, AuthError } from "../lib/auth.js";
-import { startApiManager, login } from "@mcp-soporte-cliente/api-manager";
+import { startAuthServer, login } from "@mcp-soporte-cliente/auth-server";
 import {
   getCustomerProfile,
   getCustomerOrders,
@@ -26,22 +26,22 @@ import {
   sendCustomerEmail,
 } from "../lib/tools.js";
 
-let apiManager;
+let authServer;
 let agentA, agentB; // tenant-A/AGENT y tenant-B/AGENT, obtenidos vía login OAuth
 
 before(async () => {
-  apiManager = await startApiManager();
-  process.env.API_MANAGER_URL = apiManager.url;
+  authServer = await startAuthServer();
+  process.env.AUTH_SERVER_URL = authServer.url;
 
-  const agentALogin = await login({ baseUrl: apiManager.url, username: "agent.a", password: "demo1234" });
-  const agentBLogin = await login({ baseUrl: apiManager.url, username: "agent.b", password: "demo1234" });
+  const agentALogin = await login({ baseUrl: authServer.url, username: "agent.a", password: "demo1234" });
+  const agentBLogin = await login({ baseUrl: authServer.url, username: "agent.b", password: "demo1234" });
 
   agentA = await resolveCallerContext(agentALogin.access_token);
   agentB = await resolveCallerContext(agentBLogin.access_token);
 });
 
 after(async () => {
-  await apiManager.close();
+  await authServer.close();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,7 +115,7 @@ describe("Control de roles", () => {
   });
 
   it("rol SUPPORT no puede solicitar reembolsos — requiere FINANCE", async () => {
-    const supportLogin = await login({ baseUrl: apiManager.url, username: "support.a", password: "demo1234" });
+    const supportLogin = await login({ baseUrl: authServer.url, username: "support.a", password: "demo1234" });
     const supportCtx   = await resolveCallerContext(supportLogin.access_token);
     await assert.rejects(
       () => requestRefundApproval(supportCtx, {

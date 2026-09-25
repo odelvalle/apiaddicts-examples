@@ -1,11 +1,11 @@
 /**
  * bin/login.js
  * CLI de demo: ejecuta el login OAuth (Authorization Code + PKCE) contra un
- * API Manager ya arrancado y muestra el access_token resultante para poder
+ * Authorization Server ya arrancado y muestra el access_token resultante para poder
  * copiarlo como `callerToken` en MCP Inspector.
  *
  * Uso:
- *   pnpm --filter @mcp-soporte-cliente/api-manager login -- --username support.a --password demo1234
+ *   pnpm --filter @mcp-soporte-cliente/auth-server login -- --username support.a --password demo1234
  */
 
 import { parseArgs } from "node:util";
@@ -25,7 +25,7 @@ if (!values.username || !values.password) {
   process.exit(1);
 }
 
-const baseUrl = values.url || process.env.API_MANAGER_URL || "http://localhost:4001";
+const baseUrl = values.url || process.env.AUTH_SERVER_URL || "http://localhost:4001";
 
 try {
   const result = await login({

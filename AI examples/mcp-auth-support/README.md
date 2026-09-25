@@ -10,7 +10,7 @@ El repositorio está dividido en dos apps independientes (cada una levanta
 su propio proceso/servicio, no son librerías compartidas):
 
 - **`@mcp-soporte-cliente/mcp-server`** — el servidor MCP (resource server).
-- **`@mcp-soporte-cliente/api-manager`** — el API Manager / Authorization
+- **`@mcp-soporte-cliente/auth-server`** — el Authorization
   Server externo simulado, que valida tokens vía introspección OAuth 2.0.
 
 ---
@@ -20,12 +20,12 @@ su propio proceso/servicio, no son librerías compartidas):
 ```bash
 pnpm install
 pnpm test                                        # ejecuta los tests de todas las apps
-pnpm run api-manager                            # terminal 1: Authorization Server simulado (puerto 4001)
+pnpm run auth-server                            # terminal 1: Authorization Server simulado (puerto 4001)
 npx @modelcontextprotocol/inspector node apps/mcp-server/server.js  # terminal 2
 ```
 
 El servidor MCP **no valida tokens por sí mismo**: delega en la app
-`api-manager` vía introspección OAuth 2.0. Si el API Manager no está
+`auth-server` vía introspección OAuth 2.0. Si el Authorization Server no está
 arrancado, todas las tools rechazarán las llamadas con `Servicio de autorización no disponible`.
 
 ---
@@ -33,16 +33,16 @@ arrancado, todas las tools rechazarán las llamadas con `Servicio de autorizaci�
 ## Estructura del proyecto
 
 ```
-ejemplo-práctico/
+mcp-auth-support/
 ├── pnpm-workspace.yaml            # Declara las apps del monorepo
-├── package.json                   # Workspace raíz (scripts agregados: start, test, api-manager)
+├── package.json                   # Workspace raíz (scripts agregados: start, test, auth-server)
 └── apps/
     ├── mcp-server/                 # @mcp-soporte-cliente/mcp-server
     │   ├── server.js                # Punto de entrada MCP (transporte stdio)
     │   ├── lib/
     │   │   ├── data.js               # Estado en memoria (simula base de datos)
     │   │   ├── auth.js               # Resolución de token vía introspección OAuth y control de acceso
-    │   │   ├── oauthClient.js        # Cliente HTTP hacia el API Manager (timeout, fail-closed)
+    │   │   ├── oauthClient.js        # Cliente HTTP hacia el Authorization Server (timeout, fail-closed)
     │   │   ├── audit.js              # Audit log con correlationId y PII masking
     │   │   └── tools.js              # Lógica de negocio (testable sin MCP)
     │   └── tests/
@@ -50,41 +50,41 @@ ejemplo-práctico/
     │       ├── 02-authorization.test.js  # Tenant isolation y roles
     │       ├── 03-adversarial.test.js    # Prompt injection y abuso de parámetros
     │       └── 04-oauth-manager.test.js  # Login, expirado, revocado, caído, timeout, scopes
-    └── api-manager/                # @mcp-soporte-cliente/api-manager
-        ├── index.js                   # Exporta startApiManager, login, revokeToken
+    └── auth-server/                # @mcp-soporte-cliente/auth-server
+        ├── index.js                   # Exporta startAuthServer, login, revokeToken
         ├── bin/
         │   ├── start.js                 # Arranca el Authorization Server (standalone)
         │   └── login.js                 # CLI: ejecuta el login OAuth y muestra el access_token
         └── lib/
-            ├── apiManager.js            # Authorization Server: /oauth/authorize, /login, /token, /introspect, /revoke
+            ├── authServer.js            # Authorization Server: /oauth/authorize, /login, /token, /introspect, /revoke
             └── demoClient.js            # Cliente de demo del flujo Authorization Code + PKCE
 ```
 
 La lógica de negocio vive en `apps/mcp-server/lib/tools.js`, **separada
 del protocolo MCP**. Esto permite testear la seguridad directamente, sin
 levantar el servidor. Los tests de la app `mcp-server` dependen de la
-app `api-manager` como `devDependency` con el protocolo `workspace:*`
+app `auth-server` como `devDependency` con el protocolo `workspace:*`
 de pnpm, para poder levantar una instancia real en cada test.
 
 ---
 
-## Autenticación: OAuth 2.0 Authorization Code + PKCE, delegado a un API Manager externo
+## Autenticación: OAuth 2.0 Authorization Code + PKCE, delegado a un Authorization Server externo
 
 El MCP server actúa como **resource server** OAuth 2.0: no contiene ninguna
 tabla de usuarios, contraseñas ni lógica de login. Toda la autenticación
-ocurre en la app **api-manager**, que implementa el flujo estándar
+ocurre en la app **auth-server**, que implementa el flujo estándar
 **Authorization Code + PKCE** (RFC 6749 + RFC 7636):
 
 ```
-1. Humano/CLI  ──GET /oauth/authorize──▶  API Manager   (formulario de login)
-2. Humano/CLI  ──POST /oauth/login─────▶  API Manager   (usuario + contraseña)
+1. Humano/CLI  ──GET /oauth/authorize──▶  Authorization Server   (formulario de login)
+2. Humano/CLI  ──POST /oauth/login─────▶  Authorization Server   (usuario + contraseña)
                                               │
                                               └─▶ devuelve un `code` de un solo uso
-3. Humano/CLI  ──POST /oauth/token─────▶  API Manager   (code + code_verifier)
+3. Humano/CLI  ──POST /oauth/token─────▶  Authorization Server   (code + code_verifier)
                                               │
                                               └─▶ devuelve el access_token
 
-4. Agente ──callerToken (access_token)──▶ MCP server ──POST /oauth/introspect──▶ API Manager
+4. Agente ──callerToken (access_token)──▶ MCP server ──POST /oauth/introspect──▶ Authorization Server
                                                 │                                      │
                                                 │◀── { active, sub, tenant_id, scope } ┘
                                                 ▼
@@ -93,7 +93,7 @@ ocurre en la app **api-manager**, que implementa el flujo estándar
 ```
 
 Los pasos 1-3 los realiza un cliente (en esta demo, la CLI `pnpm --filter
-@mcp-soporte-cliente/api-manager login`) **antes** de hablar con el MCP
+@mcp-soporte-cliente/auth-server login`) **antes** de hablar con el MCP
 server. El paso 4 es el único que ejecuta el MCP server en cada llamada a
 una tool, y es puramente de validación (introspección) — nunca ve la
 contraseña del usuario.
@@ -104,13 +104,13 @@ el `code` por el token debe volver a presentar el `code_verifier` original.
 Esto evita que un `code` interceptado (p.ej. en el historial de un navegador)
 pueda canjearse por un atacante que no conozca el verifier.
 
-**Fail-closed:** si el API Manager no responde (caído, timeout de red), el
+**Fail-closed:** si el Authorization Server no responde (caído, timeout de red), el
 acceso se deniega — nunca se asume que un token es válido por defecto.
 
 ## Usuarios y flujo de login
 
 No hay tokens estáticos: cada `access_token` se obtiene iniciando sesión con
-usuario y contraseña contra el API Manager. Estos son los usuarios de demo:
+usuario y contraseña contra el Authorization Server. Estos son los usuarios de demo:
 
 | Usuario | Contraseña | Tenant | Scope OAuth | Roles resultantes |
 |---------|-----------|--------|-------------|--------------------|
@@ -119,15 +119,15 @@ usuario y contraseña contra el API Manager. Estos son los usuarios de demo:
 | `finance.a` | `demo1234` | tenant-A | `agent:read finance:refund` | AGENT, FINANCE |
 | `agent.b`   | `demo1234` | tenant-B | `agent:read` | AGENT |
 
-Para obtener un `access_token` real (con el API Manager ya arrancado):
+Para obtener un `access_token` real (con el Authorization Server ya arrancado):
 
 ```bash
-pnpm --filter @mcp-soporte-cliente/api-manager login -- --username support.a --password demo1234
+pnpm --filter @mcp-soporte-cliente/auth-server login -- --username support.a --password demo1234
 ```
 
 Esto ejecuta el flujo completo (login + PKCE + intercambio de code) y
 imprime el `access_token` que debes pegar como `callerToken` en MCP
-Inspector. Cada token expira según `API_MANAGER_TOKEN_TTL_MS` (1 hora por
+Inspector. Cada token expira según `AUTH_SERVER_TOKEN_TTL_MS` (1 hora por
 defecto) y puede revocarse vía `POST /oauth/revoke`.
 
 ---
@@ -141,14 +141,14 @@ escribe en `stderr`.
 ### Arrancar
 
 ```bash
-pnpm run api-manager                                 # terminal 1: Authorization Server simulado
-pnpm --filter @mcp-soporte-cliente/api-manager login -- --username agent.a --password demo1234
+pnpm run auth-server                                 # terminal 1: Authorization Server simulado
+pnpm --filter @mcp-soporte-cliente/auth-server login -- --username agent.a --password demo1234
                                                       # copia el access_token que imprime
 npx @modelcontextprotocol/inspector node apps/mcp-server/server.js   # terminal 2
 ```
 
-El servidor MCP consulta el API Manager en cada llamada a una tool. Si el
-Inspector se lanza sin haber arrancado `pnpm run api-manager` primero, todas
+El servidor MCP consulta el Authorization Server en cada llamada a una tool. Si el
+Inspector se lanza sin haber arrancado `pnpm run auth-server` primero, todas
 las tools devolverán `Servicio de autorización no disponible` (fail-closed).
 Repite el comando `login` con `support.a` o `finance.a` para obtener tokens
 con otros roles.
@@ -165,7 +165,7 @@ En la terminal donde arrancaste el Inspector verás los audit logs en tiempo rea
 ### Secuencia de demo recomendada
 
 En cada paso, sustituye `<access_token>` por el token obtenido con
-`pnpm --filter @mcp-soporte-cliente/api-manager login -- --username <usuario> --password demo1234`
+`pnpm --filter @mcp-soporte-cliente/auth-server login -- --username <usuario> --password demo1234`
 para el usuario indicado.
 
 #### Paso 1 — Consulta de perfil (happy path)
@@ -533,7 +533,7 @@ protocolo MCP (JSON-RPC).
 | `01-functional.test.js` | Happy path: las tools devuelven lo correcto con parámetros válidos | 9 |
 | `02-authorization.test.js` | Tenant isolation, elevación de rol, tokens inválidos | 11 |
 | `03-adversarial.test.js` | Prompt injection, IDs maliciosos, overflow numérico, campos extra, templates fuera de allowlist | 11 |
-| `04-oauth-manager.test.js` | Login OAuth (Authorization Code + PKCE), token expirado/revocado, mapeo scope→rol, API Manager caído o lento (fail-closed) | 8 |
+| `04-oauth-manager.test.js` | Login OAuth (Authorization Code + PKCE), token expirado/revocado, mapeo scope→rol, Authorization Server caído o lento (fail-closed) | 8 |
 
 Ejecutar con:
 

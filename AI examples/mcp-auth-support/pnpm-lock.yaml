@@ -8,7 +8,7 @@ importers:
 
   .: {}
 
-  apps/api-manager: {}
+  apps/auth-server: {}
 
   apps/mcp-server:
     dependencies:
@@ -19,9 +19,9 @@ importers:
         specifier: ^3.23.8
         version: 3.25.76
     devDependencies:
-      '@mcp-soporte-cliente/api-manager':
+      '@mcp-soporte-cliente/auth-server':
         specifier: workspace:*
-        version: link:../api-manager
+        version: link:../auth-server
 
 packages:
 

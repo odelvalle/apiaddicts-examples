@@ -13,7 +13,7 @@ import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 
 import { resolveCallerContext } from "../lib/auth.js";
-import { startApiManager, login } from "@mcp-soporte-cliente/api-manager";
+import { startAuthServer, login } from "@mcp-soporte-cliente/auth-server";
 import {
   getCustomerProfile,
   getCustomerOrders,
@@ -25,17 +25,17 @@ import {
 import { tickets, approvals, emailLog } from "../lib/data.js";
 
 // Contextos de prueba — se obtienen vía login OAuth (Authorization Code + PKCE)
-// y se resuelven contra el API Manager simulado (introspección)
-let apiManager;
+// y se resuelven contra el Authorization Server simulado (introspección)
+let authServer;
 let agentCtx, supportCtx, financeCtx;
 
 before(async () => {
-  apiManager = await startApiManager();
-  process.env.API_MANAGER_URL = apiManager.url;
+  authServer = await startAuthServer();
+  process.env.AUTH_SERVER_URL = authServer.url;
 
-  const agentLogin   = await login({ baseUrl: apiManager.url, username: "agent.a",   password: "demo1234" });
-  const supportLogin = await login({ baseUrl: apiManager.url, username: "support.a", password: "demo1234" });
-  const financeLogin = await login({ baseUrl: apiManager.url, username: "finance.a", password: "demo1234" });
+  const agentLogin   = await login({ baseUrl: authServer.url, username: "agent.a",   password: "demo1234" });
+  const supportLogin = await login({ baseUrl: authServer.url, username: "support.a", password: "demo1234" });
+  const financeLogin = await login({ baseUrl: authServer.url, username: "finance.a", password: "demo1234" });
 
   agentCtx   = await resolveCallerContext(agentLogin.access_token);
   supportCtx = await resolveCallerContext(supportLogin.access_token);
@@ -43,7 +43,7 @@ before(async () => {
 });
 
 after(async () => {
-  await apiManager.close();
+  await authServer.close();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

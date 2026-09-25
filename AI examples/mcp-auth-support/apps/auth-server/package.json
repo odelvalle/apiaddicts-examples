@@ -1,8 +1,8 @@
 {
-  "name": "@mcp-soporte-cliente/api-manager",
+  "name": "@mcp-soporte-cliente/auth-server",
   "version": "1.0.0",
   "private": true,
-  "description": "API Manager / Authorization Server simulado (OAuth 2.0 Authorization Code + PKCE, introspección RFC 7662)",
+  "description": "Authorization Server simulado (OAuth 2.0 Authorization Code + PKCE, introspección RFC 7662)",
   "type": "module",
   "main": "index.js",
   "scripts": {
