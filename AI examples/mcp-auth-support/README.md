@@ -107,6 +107,15 @@ pueda canjearse por un atacante que no conozca el verifier.
 **Fail-closed:** si el Authorization Server no responde (caído, timeout de red), el
 acceso se deniega — nunca se asume que un token es válido por defecto.
 
+**Sobre `callerToken` como parámetro de la tool:** en este demo el MCP server
+usa transporte **stdio** (el mismo que Claude Desktop y MCP Inspector), que no
+tiene el concepto de cabeceras HTTP — solo mensajes JSON-RPC por stdin/stdout.
+Por eso `callerToken` viaja como campo del `inputSchema` de cada tool, visible
+para el agente. En producción, con transporte HTTP (`StreamableHTTPServerTransport`),
+el token se envía en el header `Authorization: Bearer <token>` y el servidor lo
+extrae de la petición, **nunca** como parámetro visible al modelo — así se evita
+que el LLM llegue a ver o manipular el token.
+
 ## Usuarios y flujo de login
 
 No hay tokens estáticos: cada `access_token` se obtiene iniciando sesión con
