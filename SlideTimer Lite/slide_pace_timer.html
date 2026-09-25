@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Slide Pace Timer — MCP Owner</title>
+  <style>
+    :root {
+      --bg: #101318;
+      --panel: #171b22;
+      --panel2: #1f2530;
+      --text: #f3f6fb;
+      --muted: #aab3c2;
+      --line: #303848;
+      --good: #33d17a;
+      --bad: #ff6b6b;
+      --warn: #ffd166;
+      --accent: #7aa2ff;
+      --button: #263044;
+      --buttonHover: #34415b;
+      --shadow: rgba(0,0,0,.35);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: radial-gradient(circle at 20% 0%, #202a3b 0, var(--bg) 35%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      padding: 18px 22px 12px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(16, 19, 24, .88);
+      backdrop-filter: blur(10px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    h1 { margin: 0; font-size: 20px; letter-spacing: .2px; }
+    .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; }
+    main { display: grid; grid-template-columns: 1.15fr .85fr; gap: 18px; padding: 18px; }
+    .card {
+      background: rgba(23, 27, 34, .94);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 18px 50px var(--shadow);
+      overflow: hidden;
+    }
+    .cardBody { padding: 18px; }
+    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .spaceBetween { justify-content: space-between; }
+    .currentSlide {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    .slideTitle {
+      font-size: clamp(26px, 4vw, 46px);
+      font-weight: 780;
+      line-height: 1.04;
+      margin: 0 0 16px;
+    }
+    .timerGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; }
+    .metric {
+      padding: 14px;
+      border-radius: 14px;
+      background: var(--panel2);
+      border: 1px solid var(--line);
+    }
+    .metric .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+    .metric .value { font-size: clamp(26px, 4vw, 48px); font-variant-numeric: tabular-nums; font-weight: 800; margin-top: 5px; }
+    .metric.small .value { font-size: 28px; }
+    .good { color: var(--good); }
+    .bad { color: var(--bad); }
+    .warn { color: var(--warn); }
+    .muted { color: var(--muted); }
+    button, input, select, textarea {
+      font: inherit;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: var(--button);
+      color: var(--text);
+    }
+    button { padding: 10px 14px; cursor: pointer; font-weight: 650; }
+    button:hover { background: var(--buttonHover); }
+    button.primary { background: #335aa8; border-color: #4f75c3; }
+    button.primary:hover { background: #416cc5; }
+    button.danger { background: #5c2630; border-color: #8a3948; }
+    input { padding: 8px 10px; width: 100%; }
+    .controls { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .tableWrap { overflow: auto; max-height: calc(100vh - 175px); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 9px 8px; vertical-align: middle; }
+    th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; position: sticky; top: 0; background: var(--panel); z-index: 2; }
+    tr.active { background: rgba(122, 162, 255, .15); }
+    tr.done { opacity: .92; }
+    td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    td.titleCell { min-width: 270px; }
+    .durationInput { width: 72px; text-align: center; }
+    .toolbar { padding: 12px 14px; background: rgba(31, 37, 48, .9); border-bottom: 1px solid var(--line); }
+    .help { font-size: 13px; color: var(--muted); line-height: 1.5; margin-top: 12px; }
+    .kbd { border: 1px solid var(--line); border-bottom-width: 2px; padding: 1px 6px; border-radius: 6px; color: var(--text); background: #0e1117; font-size: 12px; }
+    .progressBar { height: 12px; background: #0e1117; border-radius: 999px; overflow: hidden; border: 1px solid var(--line); margin-top: 14px; }
+    .progressFill { height: 100%; width: 0%; background: var(--accent); transition: width .2s linear; }
+    .progressFill.over { background: var(--bad); }
+    .footerActions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+    .hiddenFile { display: none; }
+    @media (max-width: 980px) {
+      main { grid-template-columns: 1fr; }
+      .timerGrid { grid-template-columns: 1fr; }
+      .tableWrap { max-height: none; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Slide Pace Timer — MCP Owner Seguridad y Testing</h1>
+  <div class="subtitle">Contador por diapositiva + desviación positiva/negativa + balance acumulado. Funciona localmente en el navegador.</div>
+</header>
+<main>
+  <section class="card">
+    <div class="cardBody">
+      <div class="row spaceBetween">
+        <div class="currentSlide" id="currentSlideLabel">Slide 1 / 24</div>
+        <div class="currentSlide" id="statusLabel">Pausado</div>
+      </div>
+      <h2 class="slideTitle" id="slideTitle">—</h2>
+      <div class="progressBar"><div class="progressFill" id="progressFill"></div></div>
+      <div class="timerGrid">
+        <div class="metric">
+          <div class="label">Contador slide</div>
+          <div class="value" id="elapsedValue">00:00</div>
+        </div>
+        <div class="metric">
+          <div class="label">Tiempo restante / exceso</div>
+          <div class="value" id="remainingValue">+00:00</div>
+        </div>
+        <div class="metric">
+          <div class="label">Balance acumulado</div>
+          <div class="value" id="balanceValue">+00:00</div>
+        </div>
+      </div>
+      <div class="timerGrid">
+        <div class="metric small">
+          <div class="label">Objetivo slide</div>
+          <div class="value" id="targetValue">00:00</div>
+        </div>
+        <div class="metric small">
+          <div class="label">Tiempo total objetivo</div>
+          <div class="value" id="totalTargetValue">00:00</div>
+        </div>
+        <div class="metric small">
+          <div class="label">Tiempo real acumulado</div>
+          <div class="value" id="actualTotalValue">00:00</div>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="primary" id="startPauseBtn">▶ Iniciar</button>
+        <button id="nextBtn">Siguiente slide</button>
+        <button id="prevBtn">Anterior</button>
+        <button id="resetBtn">Reiniciar slide</button>
+        <button id="finishBtn">Finalizar</button>
+        <button id="fullscreenBtn">Pantalla completa</button>
+      </div>
+      <div class="help">
+        Atajos: <span class="kbd">Espacio</span> iniciar/pausar, <span class="kbd">N</span> siguiente, <span class="kbd">P</span> anterior, <span class="kbd">R</span> reiniciar slide, <span class="kbd">F</span> pantalla completa. El contador de cada slide empieza en 0. Mientras estés dentro del tiempo verás saldo positivo; si te pasas, saldo negativo. Al avanzar, ese saldo se suma al balance acumulado.
+      </div>
+      <div class="footerActions">
+        <button id="exportCsvBtn">Exportar CSV</button>
+        <button id="exportJsonBtn">Exportar JSON</button>
+        <button id="importJsonBtn">Importar JSON</button>
+        <input class="hiddenFile" type="file" id="jsonFile" accept="application/json,.json" />
+        <button class="danger" id="clearBtn">Borrar progreso</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="toolbar row spaceBetween">
+      <strong>Plan por diapositiva</strong>
+      <span class="muted" id="summaryLabel">24 slides · 02:30:00</span>
+    </div>
+    <div class="tableWrap">
+      <table id="slidesTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Título</th>
+            <th>Obj.</th>
+            <th>Real</th>
+            <th>Δ</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<script>
+const DEFAULT_SLIDES = [
+  {n:1, title:'MCP Owner — Seguridad y Testing', target:120},
+  {n:2, title:'Objetivo de la sesión', target:240},
+  {n:3, title:'Agenda: de amenaza a evidencia', target:240},
+  {n:4, title:'API Owner vs MCP Owner', target:420},
+  {n:5, title:'Superficie MCP: no solo endpoints', target:360},
+  {n:6, title:'Modelo de amenazas MCP', target:360},
+  {n:7, title:'Prompt injection: el ataque entra por el contexto', target:480},
+  {n:8, title:'Tool poisoning: metadata hostil', target:360},
+  {n:9, title:'Cross-server shadowing: interferencia entre servidores', target:300},
+  {n:10, title:'Toxic flows: el riesgo está en la combinación', target:540},
+  {n:11, title:'Flujo destructivo: contenido no confiable + acción irreversible', target:300},
+  {n:12, title:'Diseño seguro: tools pequeñas, específicas y limitadas', target:420},
+  {n:13, title:'Arquitectura de control: el modelo propone, el sistema autoriza', target:360},
+  {n:14, title:'Testing MCP: de input-output a comportamiento observable', target:480},
+  {n:15, title:'MCP evaluation pipeline: inspección → reporte', target:420},
+  {n:16, title:'Primero reglas deterministas; después LLM judging', target:300},
+  {n:17, title:'Constraints útiles para publicar MCP Servers', target:360},
+  {n:18, title:'Cuidado: los tests pueden ejecutar acciones reales', target:300},
+  {n:19, title:'Security scanning: detectar contenido y dependencias peligrosas', target:360},
+  {n:20, title:'Matriz mínima de pruebas MCP', target:480},
+  {n:21, title:'Observabilidad: evidencia de control', target:300},
+  {n:22, title:'Checklist MCP Owner: publicación segura', target:360},
+  {n:23, title:'Ejercicio: aprobar un MCP de atención al cliente', target:900},
+  {n:24, title:'Cierre: publicar menos, publicar mejor', target:240}
+];
+const STORAGE_KEY = 'mcp-slide-pace-timer-v1';
+let state = loadState();
+let ticker = null;
+
+function cloneDefault() { return DEFAULT_SLIDES.map(s => ({...s, actual:null, delta:null, startedAt:null, completed:false})); }
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return { slides: cloneDefault(), currentIndex: 0, running: false, currentStartMs: null, elapsedBeforePause: 0, finished:false };
+}
+function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function fmt(seconds, signed=false) {
+  seconds = Math.round(seconds || 0);
+  const sign = seconds < 0 ? '-' : (signed ? '+' : '');
+  const abs = Math.abs(seconds);
+  const h = Math.floor(abs/3600), m = Math.floor((abs%3600)/60), s = abs%60;
+  const body = h>0 ? `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return sign + body;
+}
+function parseMinutes(v) { const num = Number(v); return Number.isFinite(num) && num >= 0 ? Math.round(num*60) : 0; }
+function currentElapsed() {
+  if (!state.running || !state.currentStartMs) return state.elapsedBeforePause || 0;
+  return (state.elapsedBeforePause || 0) + (Date.now() - state.currentStartMs) / 1000;
+}
+function cumulativeBalance(includeCurrent=false) {
+  let sum = 0;
+  state.slides.forEach((s, idx) => {
+    if (idx < state.currentIndex && s.delta !== null) sum += s.delta;
+  });
+  if (includeCurrent && state.currentIndex < state.slides.length) {
+    const s = state.slides[state.currentIndex];
+    sum += s.target - currentElapsed();
+  }
+  return sum;
+}
+function totalTarget() { return state.slides.reduce((a,s)=>a+s.target,0); }
+function totalActual() {
+  let sum = 0;
+  state.slides.forEach((s, idx) => {
+    if (idx < state.currentIndex && s.actual !== null) sum += s.actual;
+  });
+  if (!state.finished && state.currentIndex < state.slides.length) sum += currentElapsed();
+  return sum;
+}
+function setClassBySign(el, val) {
+  el.classList.remove('good','bad','warn');
+  if (val > 0) el.classList.add('good');
+  else if (val < 0) el.classList.add('bad');
+  else el.classList.add('warn');
+}
+function render() {
+  const s = state.slides[state.currentIndex] || state.slides[state.slides.length - 1];
+  const elapsed = state.finished ? 0 : currentElapsed();
+  const remaining = state.finished ? 0 : s.target - elapsed;
+  const balance = state.finished ? cumulativeBalance(false) : cumulativeBalance(true);
+  document.getElementById('currentSlideLabel').textContent = state.finished ? 'Presentación finalizada' : `Slide ${state.currentIndex+1} / ${state.slides.length}`;
+  document.getElementById('statusLabel').textContent = state.finished ? 'Finalizado' : (state.running ? 'En marcha' : 'Pausado');
+  document.getElementById('slideTitle').textContent = state.finished ? 'Presentación finalizada' : s.title;
+  document.getElementById('elapsedValue').textContent = fmt(elapsed);
+  document.getElementById('remainingValue').textContent = fmt(remaining, true);
+  document.getElementById('balanceValue').textContent = fmt(balance, true);
+  document.getElementById('targetValue').textContent = fmt(state.finished ? 0 : s.target);
+  document.getElementById('totalTargetValue').textContent = fmt(totalTarget());
+  document.getElementById('actualTotalValue').textContent = fmt(totalActual());
+  setClassBySign(document.getElementById('remainingValue'), remaining);
+  setClassBySign(document.getElementById('balanceValue'), balance);
+  document.getElementById('startPauseBtn').textContent = state.running ? '⏸ Pausar' : '▶ Iniciar';
+  const pct = state.finished ? 100 : Math.min(100, Math.max(0, (elapsed / Math.max(1,s.target))*100));
+  const fill = document.getElementById('progressFill');
+  fill.style.width = pct + '%';
+  fill.classList.toggle('over', remaining < 0);
+  renderTable();
+  document.getElementById('summaryLabel').textContent = `${state.slides.length} slides · ${fmt(totalTarget())}`;
+}
+function renderTable() {
+  const tbody = document.querySelector('#slidesTable tbody');
+  tbody.innerHTML = '';
+  state.slides.forEach((s, idx) => {
+    const tr = document.createElement('tr');
+    if (idx === state.currentIndex && !state.finished) tr.classList.add('active');
+    if (s.completed) tr.classList.add('done');
+    const real = idx === state.currentIndex && !state.finished ? currentElapsed() : s.actual;
+    const delta = idx === state.currentIndex && !state.finished ? s.target - currentElapsed() : s.delta;
+    tr.innerHTML = `
+      <td class="num">${idx+1}</td>
+      <td class="titleCell"><input data-title="${idx}" value="${escapeHtml(s.title)}" /></td>
+      <td class="num"><input class="durationInput" data-target="${idx}" type="number" min="0" step="0.5" value="${(s.target/60).toFixed(s.target % 60 === 0 ? 0 : 1)}" title="minutos" /></td>
+      <td class="num">${real === null || real === undefined ? '—' : fmt(real)}</td>
+      <td class="num ${delta === null || delta === undefined ? '' : (delta >= 0 ? 'good' : 'bad')}">${delta === null || delta === undefined ? '—' : fmt(delta, true)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('[data-title]').forEach(inp => inp.addEventListener('change', e => {
+    state.slides[Number(e.target.dataset.title)].title = e.target.value.trim() || 'Sin título'; saveState(); render();
+  }));
+  tbody.querySelectorAll('[data-target]').forEach(inp => inp.addEventListener('change', e => {
+    state.slides[Number(e.target.dataset.target)].target = parseMinutes(e.target.value); saveState(); render();
+  }));
+}
+function escapeHtml(str) { return String(str).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+function startPause() {
+  if (state.finished) return;
+  if (state.running) {
+    state.elapsedBeforePause = currentElapsed();
+    state.running = false;
+    state.currentStartMs = null;
+  } else {
+    state.running = true;
+    state.currentStartMs = Date.now();
+  }
+  saveState(); render();
+}
+function completeCurrent() {
+  if (state.finished) return;
+  const elapsed = currentElapsed();
+  const s = state.slides[state.currentIndex];
+  s.actual = Math.round(elapsed);
+  s.delta = Math.round(s.target - elapsed);
+  s.completed = true;
+}
+function nextSlide() {
+  if (state.finished) return;
+  completeCurrent();
+  if (state.currentIndex >= state.slides.length - 1) { finishPresentation(); return; }
+  state.currentIndex++;
+  state.elapsedBeforePause = 0;
+  state.currentStartMs = state.running ? Date.now() : null;
+  saveState(); render();
+}
+function prevSlide() {
+  if (state.currentIndex <= 0) return;
+  state.currentIndex--;
+  state.finished = false;
+  const s = state.slides[state.currentIndex];
+  s.actual = null; s.delta = null; s.completed = false;
+  state.elapsedBeforePause = 0;
+  state.currentStartMs = state.running ? Date.now() : null;
+  saveState(); render();
+}
+function resetCurrent() {
+  if (state.finished) return;
+  const s = state.slides[state.currentIndex];
+  s.actual = null; s.delta = null; s.completed = false;
+  state.elapsedBeforePause = 0;
+  state.currentStartMs = state.running ? Date.now() : null;
+  saveState(); render();
+}
+function finishPresentation() {
+  if (!state.finished) completeCurrent();
+  state.running = false;
+  state.currentStartMs = null;
+  state.elapsedBeforePause = 0;
+  state.finished = true;
+  saveState(); render();
+}
+function exportCsv() {
+  const rows = [['slide','title','target_seconds','actual_seconds','delta_seconds','target','actual','delta']];
+  state.slides.forEach((s,i)=>rows.push([i+1, s.title, s.target, s.actual ?? '', s.delta ?? '', fmt(s.target), s.actual==null?'':fmt(s.actual), s.delta==null?'':fmt(s.delta,true)]));
+  download('mcp-slide-pace-results.csv', rows.map(r => r.map(csvCell).join(',')).join('\n'), 'text/csv');
+}
+function csvCell(v) { return '"' + String(v).replaceAll('"','""') + '"'; }
+function exportJson() { download('mcp-slide-pace-state.json', JSON.stringify(state, null, 2), 'application/json'); }
+function download(name, content, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], {type}));
+  a.download = name;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function importJson(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const imported = JSON.parse(reader.result);
+      if (!Array.isArray(imported.slides)) throw new Error('Formato inválido');
+      state = imported;
+      state.running = false; state.currentStartMs = null;
+      saveState(); render();
+    } catch(e) { alert('No se pudo importar el JSON: ' + e.message); }
+  };
+  reader.readAsText(file);
+}
+function clearProgress() {
+  if (!confirm('¿Borrar progreso y volver al plan inicial de 2h30?')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  state = loadState(); render();
+}
+function fullscreen() {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+  else document.exitFullscreen?.();
+}
+document.getElementById('startPauseBtn').addEventListener('click', startPause);
+document.getElementById('nextBtn').addEventListener('click', nextSlide);
+document.getElementById('prevBtn').addEventListener('click', prevSlide);
+document.getElementById('resetBtn').addEventListener('click', resetCurrent);
+document.getElementById('finishBtn').addEventListener('click', finishPresentation);
+document.getElementById('fullscreenBtn').addEventListener('click', fullscreen);
+document.getElementById('exportCsvBtn').addEventListener('click', exportCsv);
+document.getElementById('exportJsonBtn').addEventListener('click', exportJson);
+document.getElementById('importJsonBtn').addEventListener('click', ()=>document.getElementById('jsonFile').click());
+document.getElementById('jsonFile').addEventListener('change', e => { if (e.target.files[0]) importJson(e.target.files[0]); e.target.value=''; });
+document.getElementById('clearBtn').addEventListener('click', clearProgress);
+document.addEventListener('keydown', e => {
+  if (['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+  if (e.code === 'Space') { e.preventDefault(); startPause(); }
+  else if (e.key.toLowerCase() === 'n' || e.key === 'ArrowRight') nextSlide();
+  else if (e.key.toLowerCase() === 'p' || e.key === 'ArrowLeft') prevSlide();
+  else if (e.key.toLowerCase() === 'r') resetCurrent();
+  else if (e.key.toLowerCase() === 'f') fullscreen();
+});
+ticker = setInterval(()=>{ if (state.running) render(); }, 250);
+render();
+</script>
+</body>
+</html>

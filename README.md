@@ -20,6 +20,15 @@ Context Protocol).
   autorización, aislamiento de tenants, auditoría) que debe exigir un MCP
   Owner antes de publicar una capacidad a un agente.
 
+### SlideTimer Lite
+
+- **[SlideTimer Lite](SlideTimer%20Lite/slide_pace_timer.html)** — Herramienta
+  standalone en HTML/JS (sin dependencias ni build) para controlar el ritmo de
+  una presentación por diapositiva: mide tiempo objetivo vs. real, muestra la
+  desviación de cada slide y el balance acumulado, y permite exportar los
+  resultados a CSV/JSON. Se usa como apoyo durante las sesiones de formación
+  para no salirse del tiempo asignado a cada bloque.
+
 ## Licencia
 
 Este repositorio se distribuye bajo la licencia MIT. Consulta el fichero
