@@ -93,7 +93,7 @@ ocurre en la app **auth-server**, que implementa el flujo estándar
 ```
 
 Los pasos 1-3 los realiza un cliente (en esta demo, la CLI `pnpm --filter
-@mcp-soporte-cliente/auth-server login`) **antes** de hablar con el MCP
+@mcp-soporte-cliente/auth-server run login`) **antes** de hablar con el MCP
 server. El paso 4 es el único que ejecuta el MCP server en cada llamada a
 una tool, y es puramente de validación (introspección) — nunca ve la
 contraseña del usuario.
@@ -131,8 +131,11 @@ usuario y contraseña contra el Authorization Server. Estos son los usuarios de 
 Para obtener un `access_token` real (con el Authorization Server ya arrancado):
 
 ```bash
-pnpm --filter @mcp-soporte-cliente/auth-server login -- --username support.a --password demo1234
+pnpm --filter @mcp-soporte-cliente/auth-server run login --username support.a --password demo1234
 ```
+
+Usa `run login` para ejecutar el script del proyecto: `pnpm login` es un
+comando interno de pnpm. Los argumentos del script se pasan sin `--`.
 
 Esto ejecuta el flujo completo (login + PKCE + intercambio de code) y
 imprime el `access_token` que debes pegar como `callerToken` en MCP
@@ -151,7 +154,7 @@ escribe en `stderr`.
 
 ```bash
 pnpm run auth-server                                 # terminal 1: Authorization Server simulado
-pnpm --filter @mcp-soporte-cliente/auth-server login -- --username agent.a --password demo1234
+pnpm --filter @mcp-soporte-cliente/auth-server run login --username agent.a --password demo1234
                                                       # copia el access_token que imprime
 npx @modelcontextprotocol/inspector node apps/mcp-server/server.js   # terminal 2
 ```
@@ -174,7 +177,7 @@ En la terminal donde arrancaste el Inspector verás los audit logs en tiempo rea
 ### Secuencia de demo recomendada
 
 En cada paso, sustituye `<access_token>` por el token obtenido con
-`pnpm --filter @mcp-soporte-cliente/auth-server login -- --username <usuario> --password demo1234`
+`pnpm --filter @mcp-soporte-cliente/auth-server run login --username <usuario> --password demo1234`
 para el usuario indicado.
 
 #### Paso 1 — Consulta de perfil (happy path)

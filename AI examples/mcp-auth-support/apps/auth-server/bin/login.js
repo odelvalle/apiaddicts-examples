@@ -5,7 +5,7 @@
  * copiarlo como `callerToken` en MCP Inspector.
  *
  * Uso:
- *   pnpm --filter @mcp-soporte-cliente/auth-server login -- --username support.a --password demo1234
+ *   pnpm --filter @mcp-soporte-cliente/auth-server run login --username support.a --password demo1234
  */
 
 import { parseArgs } from "node:util";
